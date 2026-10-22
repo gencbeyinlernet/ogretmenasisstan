@@ -1,0 +1,404 @@
+import { supabase } from '../lib/supabase';
+import { Note, Assignment, AssignmentSubmission, Message, User } from '../types';
+
+// Storage keys for local fallback
+const STORAGE_KEYS = {
+  NOTES: 'burak_teacher_notes',
+  ASSIGNMENTS: 'burak_assignments',
+  SUBMISSIONS: 'burak_assignment_submissions',
+  MESSAGES: 'burak_messages',
+};
+
+// Initial default assignments so students immediately see active homework
+const defaultAssignments: Assignment[] = [
+  {
+    id: 'asg-1',
+    title: 'Fizik & Bilim: Vektörler ve Kuvvet Dengesi Problemleri',
+    subject: 'Fizik / Fen Bilimleri',
+    grade: '10. Sınıf',
+    description: 'Ders kitabındaki sayfa 42-45 arasındaki vektör bileşenleri ve serbest cisim diyagramı sorularını çözerek sonuçlarınızı buraya yazınız veya link ekleyiniz.',
+    dueDate: '2026-10-30',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'asg-2',
+    title: 'Algoritma & Programlama: Döngüler ve Karar Yapıları',
+    subject: 'Bilişim Teknolojileri',
+    grade: 'Tüm Sınıflar',
+    description: '1 den 100 e kadar olan asal sayıları bulan akış diyagramını veya kod bloğunu açıklayarak ödev cevabı olarak sisteme iletiniz.',
+    dueDate: '2026-11-05',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+// Initial default messages for realistic feel
+const defaultMessages: Message[] = [
+  {
+    id: 'msg-1',
+    senderUsername: 'ahmet',
+    receiverUsername: 'burakturgut',
+    senderRole: 'student',
+    content: 'Hocam merhaba, 10. sınıf vektörler ödevindeki 3. soruda açı değerini nasıl almamız gerekiyor?',
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    isRead: true,
+  },
+  {
+    id: 'msg-2',
+    senderUsername: 'burakturgut',
+    receiverUsername: 'ahmet',
+    senderRole: 'teacher',
+    content: 'Merhaba Ahmet, 3. soruda cos(37) = 0.8 ve sin(37) = 0.6 alabilirsin, derste bahsettiğimiz özel üçgen kuralı geçerli.',
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    isRead: true,
+  },
+];
+
+// --- 1. NOTES SERVICE ---
+export const fetchNotesFromDB = async (): Promise<Note[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        content: d.content,
+        category: d.category || 'Genel',
+        date: d.date || new Date().toISOString().split('T')[0],
+        isPinned: d.is_pinned ?? false,
+        color: d.color,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchNotes fallback:', err);
+  }
+
+  // Fallback to localStorage
+  const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return [];
+};
+
+export const saveNoteToDB = async (note: Note): Promise<void> => {
+  // Update local storage
+  const existing = await fetchNotesFromDB();
+  const index = existing.findIndex((n) => n.id === note.id);
+  let updated: Note[];
+  if (index >= 0) {
+    updated = existing.map((n) => (n.id === note.id ? note : n));
+  } else {
+    updated = [note, ...existing];
+  }
+  localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(updated));
+
+  // Try Supabase upsert
+  try {
+    await supabase.from('notes').upsert({
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      category: note.category,
+      date: note.date,
+      is_pinned: note.isPinned,
+      color: note.color,
+    });
+  } catch (err) {
+    console.warn('Supabase saveNote warning:', err);
+  }
+};
+
+export const deleteNoteFromDB = async (id: string): Promise<void> => {
+  const existing = await fetchNotesFromDB();
+  const updated = existing.filter((n) => n.id !== id);
+  localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(updated));
+
+  try {
+    await supabase.from('notes').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase deleteNote warning:', err);
+  }
+};
+
+// --- 2. ASSIGNMENTS (ÖDEVLER) SERVICE ---
+export const fetchAssignmentsFromDB = async (): Promise<Assignment[]> => {
+  let list: Assignment[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      list = data.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        subject: d.subject,
+        grade: d.grade || 'Tüm Sınıflar',
+        description: d.description,
+        dueDate: d.due_date || d.dueDate,
+        createdAt: d.created_at || d.createdAt,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchAssignments fallback:', err);
+  }
+
+  if (list.length === 0) {
+    const saved = localStorage.getItem(STORAGE_KEYS.ASSIGNMENTS);
+    if (saved) {
+      try {
+        list = JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list = defaultAssignments;
+    localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(list));
+  }
+
+  // Attach submissions
+  const allSubmissions = await fetchSubmissionsFromDB();
+  return list.map((a) => ({
+    ...a,
+    submissions: allSubmissions.filter((s) => s.assignmentId === a.id),
+  }));
+};
+
+export const saveAssignmentToDB = async (assignment: Assignment): Promise<void> => {
+  const current = await fetchAssignmentsFromDB();
+  const exists = current.some((a) => a.id === assignment.id);
+  const updated = exists
+    ? current.map((a) => (a.id === assignment.id ? assignment : a))
+    : [assignment, ...current];
+
+  localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(updated));
+
+  try {
+    await supabase.from('assignments').upsert({
+      id: assignment.id,
+      title: assignment.title,
+      subject: assignment.subject,
+      grade: assignment.grade,
+      description: assignment.description,
+      due_date: assignment.dueDate,
+      created_at: assignment.createdAt,
+    });
+  } catch (err) {
+    console.warn('Supabase saveAssignment warning:', err);
+  }
+};
+
+export const deleteAssignmentFromDB = async (id: string): Promise<void> => {
+  const current = await fetchAssignmentsFromDB();
+  const updated = current.filter((a) => a.id !== id);
+  localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(updated));
+
+  try {
+    await supabase.from('assignments').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase deleteAssignment warning:', err);
+  }
+};
+
+// --- SUBMISSIONS (ÖDEV CEVAPLARI) ---
+export const fetchSubmissionsFromDB = async (): Promise<AssignmentSubmission[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('assignment_submissions')
+      .select('*')
+      .order('submitted_at', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id,
+        assignmentId: d.assignment_id,
+        studentUsername: d.student_username,
+        answer: d.answer,
+        submittedAt: d.submitted_at,
+        feedback: d.feedback,
+        score: d.score,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchSubmissions fallback:', err);
+  }
+
+  const saved = localStorage.getItem(STORAGE_KEYS.SUBMISSIONS);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return [];
+};
+
+export const submitAssignmentAnswer = async (
+  assignmentId: string,
+  studentUsername: string,
+  answer: string
+): Promise<AssignmentSubmission> => {
+  const newSub: AssignmentSubmission = {
+    id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    assignmentId,
+    studentUsername,
+    answer,
+    submittedAt: new Date().toISOString(),
+  };
+
+  const existing = await fetchSubmissionsFromDB();
+  // Filter out any previous submission by this student for this assignment to allow resubmission
+  const filtered = existing.filter(
+    (s) => !(s.assignmentId === assignmentId && s.studentUsername.toLowerCase() === studentUsername.toLowerCase())
+  );
+  const updated = [newSub, ...filtered];
+  localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(updated));
+
+  try {
+    await supabase.from('assignment_submissions').upsert({
+      id: newSub.id,
+      assignment_id: newSub.assignmentId,
+      student_username: newSub.studentUsername,
+      answer: newSub.answer,
+      submitted_at: newSub.submittedAt,
+    });
+  } catch (err) {
+    console.warn('Supabase submitAssignmentAnswer warning:', err);
+  }
+
+  return newSub;
+};
+
+export const gradeSubmissionInDB = async (
+  submissionId: string,
+  score: string,
+  feedback: string
+): Promise<void> => {
+  const current = await fetchSubmissionsFromDB();
+  const updated = current.map((s) => (s.id === submissionId ? { ...s, score, feedback } : s));
+  localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(updated));
+
+  try {
+    await supabase
+      .from('assignment_submissions')
+      .update({ score, feedback })
+      .eq('id', submissionId);
+  } catch (err) {
+    console.warn('Supabase gradeSubmission warning:', err);
+  }
+};
+
+// --- 3. PRIVATE MESSAGES (ÖZEL MESAJLAŞMA & SORU-CEVAP) ---
+export const fetchMessagesFromDB = async (currentUser: User): Promise<Message[]> => {
+  let list: Message[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (data && !error && data.length > 0) {
+      list = data.map((d: any) => ({
+        id: d.id,
+        senderUsername: d.sender_username,
+        receiverUsername: d.receiver_username,
+        senderRole: d.sender_role,
+        content: d.content,
+        createdAt: d.created_at,
+        isRead: d.is_read,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchMessages fallback:', err);
+  }
+
+  if (list.length === 0) {
+    const saved = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+    if (saved) {
+      try {
+        list = JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list = defaultMessages;
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(list));
+  }
+
+  // Filter based on user role:
+  // - Teacher sees all messages
+  // - Student sees ONLY messages where they are sender or receiver
+  if (currentUser.role === 'teacher') {
+    return list;
+  } else {
+    const cleanUser = currentUser.username.toLowerCase();
+    return list.filter(
+      (m) =>
+        m.senderUsername.toLowerCase() === cleanUser ||
+        m.receiverUsername.toLowerCase() === cleanUser
+    );
+  }
+};
+
+export const sendMessageToDB = async (
+  sender: User,
+  receiverUsername: string,
+  content: string
+): Promise<Message> => {
+  const newMsg: Message = {
+    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    senderUsername: sender.username,
+    receiverUsername: receiverUsername.trim().toLowerCase(),
+    senderRole: sender.role,
+    content: content.trim(),
+    createdAt: new Date().toISOString(),
+    isRead: false,
+  };
+
+  // Get raw all messages from local
+  let current: Message[] = [];
+  const saved = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+  if (saved) {
+    try {
+      current = JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  const updated = [...current, newMsg];
+  localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(updated));
+
+  try {
+    await supabase.from('messages').insert([
+      {
+        id: newMsg.id,
+        sender_username: newMsg.senderUsername,
+        receiver_username: newMsg.receiverUsername,
+        sender_role: newMsg.senderRole,
+        content: newMsg.content,
+        created_at: newMsg.createdAt,
+        is_read: false,
+      },
+    ]);
+  } catch (err) {
+    console.warn('Supabase sendMessage warning:', err);
+  }
+
+  return newMsg;
+};

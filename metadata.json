@@ -1,0 +1,6 @@
+{
+  "name": "Burak Öğretmenin Not Defteri",
+  "description": "Kişisel öğretmen yönetim ve planlama platformu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
