@@ -6,8 +6,10 @@ import {
   saveAssignmentToDB, 
   deleteAssignmentFromDB, 
   submitAssignmentAnswer, 
-  gradeSubmissionInDB 
+  gradeSubmissionInDB,
+  awardBadgeToStudent
 } from '../services/supabaseService';
+
 import { 
   BookMarked, 
   Plus, 
@@ -112,9 +114,20 @@ export const AssignmentsSection: React.FC = () => {
         currentUser.username,
         studentAnswerText.trim()
       );
+
+      // Award assignment badge
+      await awardBadgeToStudent(
+        currentUser.username,
+        'assignment',
+        'Ödev Başarı Rozeti',
+        `"${selectedAssignment.title}" ödevini başarıyla teslim ettiniz!`,
+        'BookMarked',
+        selectedAssignment.title
+      );
+
       setSubmitSuccess(true);
       setStudentAnswerText('');
-      setTimeout(() => setSubmitSuccess(false), 3000);
+      setTimeout(() => setSubmitSuccess(false), 4000);
       await loadAssignments();
     } finally {
       setIsSubmittingAnswer(false);
@@ -458,11 +471,17 @@ export const AssignmentsSection: React.FC = () => {
                           />
 
                           {submitSuccess && (
-                            <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-                              <CheckCircle2 size={16} />
-                              <span>Ödeviniz başarıyla iletildi ve kaydedildi!</span>
+                            <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold flex items-center justify-between gap-2 shadow-md">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 size={18} />
+                                <span>Ödeviniz başarıyla iletildi ve kaydedildi!</span>
+                              </div>
+                              <span className="bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                +1 Rozet Eklendi! 🏆
+                              </span>
                             </div>
                           )}
+
 
                           <button
                             type="submit"

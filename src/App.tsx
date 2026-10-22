@@ -21,6 +21,8 @@ import { AnnualPlansModal } from './components/AnnualPlansModal';
 import { LinkEditorModal } from './components/LinkEditorModal';
 import { AssignmentsSection } from './components/AssignmentsSection';
 import { MessagesSection } from './components/MessagesSection';
+import { BadgesSection } from './components/BadgesSection';
+import { BadgeToast } from './components/BadgeToast';
 import { Footer } from './components/Footer';
 import { QuickLink } from './types';
 import { initialQuickLinks } from './data/initialData';
@@ -36,8 +38,12 @@ import {
   BookMarked,
   MessageSquare,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Award,
+  Trophy,
+  Crown
 } from 'lucide-react';
+
 
 function AppContent() {
   const { currentUser, isTeacher, isStudent, logout } = useAuth();
@@ -211,12 +217,20 @@ function AppContent() {
 
                 <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                   <button
+                    onClick={() => setActiveTab('rozetler')}
+                    className="px-3 py-1.5 rounded-lg hover:bg-white text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Award size={14} className="text-amber-500" />
+                    <span>{isTeacher ? 'Rozet Şampiyonları' : 'Rozetlerim'}</span>
+                  </button>
+                  <button
                     onClick={() => setActiveTab('odevler')}
                     className="px-3 py-1.5 rounded-lg hover:bg-white text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
                     <BookMarked size={14} className="text-indigo-600" />
                     <span>{isTeacher ? 'Ödev Yönetimi' : 'Ödevlerim'}</span>
                   </button>
+
                   <button
                     onClick={() => setActiveTab('mesajlar')}
                     className="px-3 py-1.5 rounded-lg hover:bg-white text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -319,6 +333,63 @@ function AppContent() {
               )}
             </section>
 
+            {/* ROZET & BAŞARI ÖNE ÇIKAN BİLGİLENDİRME ALANI */}
+            <section>
+              {isTeacher ? (
+                <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-indigo-50/50 rounded-2xl border-2 border-amber-300/80 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0 ring-2 ring-amber-300">
+                      <Crown size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-slate-900">En Çok Rozet Alan Öğrenciler (Liderlik Tablosu)</h4>
+                        <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Canlı
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Öğrencileriniz ödev teslim ettikçe ve paylaştığınız yapay zeka araçlarını keşfettikçe rozet kazanır. Kimin önde olduğunu görün!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('rozetler')}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trophy size={15} className="text-amber-400" />
+                    <span>Rozet Şampiyonlarını İncele →</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-r from-indigo-500/10 via-cyan-500/10 to-emerald-500/10 rounded-2xl border-2 border-indigo-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white flex items-center justify-center font-bold shadow-md shrink-0 ring-2 ring-indigo-200">
+                      <Award size={24} className="text-amber-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-slate-900">Rozet Koleksiyonunuz ve Başarı Durumunuz</h4>
+                        <span className="text-[10px] bg-cyan-100 text-cyan-900 font-extrabold px-2 py-0.5 rounded-full">
+                          +1 Rozet Fırsatı
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Ödevleri tamamlayarak ve öğretmeninizin paylaştığı Yapay Zeka araçlarına tıklayarak hemen yeni rozetler kazanın!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('rozetler')}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Award size={15} className="text-amber-300" />
+                    <span>Rozetlerimi İncele →</span>
+                  </button>
+                </div>
+              )}
+            </section>
+
             {/* Son Eklenen İçerikler */}
             <section>
               <RecentContentSection onOpenNotes={() => isTeacher ? setActiveTab('notlar') : setActiveTab('siniflar')} />
@@ -326,8 +397,16 @@ function AppContent() {
           </div>
         )}
 
+        {/* TAB: ROZETLER / ROZET ŞAMPİYONLARI */}
+        {activeTab === 'rozetler' && (
+          <div className="space-y-6">
+            <BadgesSection onNavigateTab={(t) => setActiveTab(t)} />
+          </div>
+        )}
+
         {/* TAB: ÖDEVLER (Both Teacher and Student) */}
         {activeTab === 'odevler' && (
+
           <div className="space-y-6">
             <AssignmentsSection />
           </div>
@@ -605,11 +684,15 @@ function AppContent() {
         onClose={() => setIsAuthModalOpen(false)}
       />
 
+      {/* Badge Earned Toast Notification */}
+      <BadgeToast />
+
       {/* Footer */}
       <Footer />
     </div>
   );
 }
+
 
 export default function App() {
   return (

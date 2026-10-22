@@ -19,8 +19,12 @@ import {
   FileSpreadsheet,
   CalendarDays,
   Gamepad2,
-  Bot
+  Bot,
+  Award,
+  Trophy
 } from 'lucide-react';
+import { fetchStudentBadges, fetchBadgesFromDB } from '../services/supabaseService';
+
 
 interface TopBarProps {
   activeTab: string;
@@ -37,11 +41,30 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { currentUser, isTeacher, isStudent, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [badgeCount, setBadgeCount] = useState<number>(0);
+
+  React.useEffect(() => {
+    const updateBadges = async () => {
+      if (currentUser && currentUser.role === 'student') {
+        const list = await fetchStudentBadges(currentUser.username);
+        setBadgeCount(list.length);
+      } else if (currentUser && currentUser.role === 'teacher') {
+        const all = await fetchBadgesFromDB();
+        setBadgeCount(all.length);
+      }
+    };
+    updateBadges();
+
+    const handleEarned = () => updateBadges();
+    window.addEventListener('badge-earned', handleEarned);
+    return () => window.removeEventListener('badge-earned', handleEarned);
+  }, [currentUser]);
 
   // Distinct menus based on role
   const navItems = isTeacher
     ? [
         { id: 'anasayfa', label: 'ANASAYFA', icon: Home },
+        { id: 'rozetler', label: 'ROZET ŞAMPİYONLARI', icon: Trophy },
         { id: 'odevler', label: 'ÖDEVLER', icon: BookMarked },
         { id: 'mesajlar', label: 'MESAJLAR', icon: MessageSquare },
         { id: 'notlar', label: 'NOT DEFTERİM', icon: Sparkles },
@@ -53,12 +76,14 @@ export const TopBar: React.FC<TopBarProps> = ({
       ]
     : [
         { id: 'anasayfa', label: 'ÖĞRENCİ ANASAYFA', icon: Home },
+        { id: 'rozetler', label: 'ROZETLERİM', icon: Award },
         { id: 'odevler', label: 'ÖDEVLERİM', icon: BookMarked },
         { id: 'mesajlar', label: 'ÖĞRETMENE SORU SOR', icon: MessageSquare },
         { id: 'siniflar', label: 'DERS İÇERİKLERİ (9-12)', icon: GraduationCap },
         { id: 'yapayzeka', label: 'YAPAY ZEKA ARAÇLARI', icon: Bot },
         { id: 'oyunlar', label: 'EĞİTİM OYUNLARI', icon: Gamepad2 },
       ];
+
 
   const handleSelectTab = (id: string) => {
     setActiveTab(id);
@@ -95,6 +120,26 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <span className="text-[10px] text-slate-400 hidden md:inline">
                   ({isTeacher ? 'Öğretmen' : 'Öğrenci'})
                 </span>
+                {isStudent && (
+                  <button
+                    onClick={() => setActiveTab('rozetler')}
+                    className="flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-black border border-amber-500/40 cursor-pointer transition-colors"
+                    title="Rozetlerimi Gör"
+                  >
+                    <Award size={11} className="text-amber-400" />
+                    <span>{badgeCount} Rozet</span>
+                  </button>
+                )}
+                {isTeacher && (
+                  <button
+                    onClick={() => setActiveTab('rozetler')}
+                    className="flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-black border border-amber-500/40 cursor-pointer transition-colors"
+                    title="Rozet Şampiyonları Liderlik Tablosu"
+                  >
+                    <Trophy size={11} className="text-amber-400" />
+                    <span className="hidden sm:inline">Rozet Tablosu</span>
+                  </button>
+                )}
                 <button
                   onClick={logout}
                   className="ml-0.5 px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
@@ -104,6 +149,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <span className="hidden sm:inline">Çıkış</span>
                 </button>
               </div>
+
             ) : (
               <button
                 onClick={onOpenAuthModal}

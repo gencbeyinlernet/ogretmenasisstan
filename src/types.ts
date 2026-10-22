@@ -125,3 +125,29 @@ export interface GameCompletion {
   score?: string;
   notes?: string;
 }
+
+export type BadgeType = 'assignment' | 'ai_tool' | 'game' | 'special';
+
+export interface StudentBadge {
+  id: string;
+  studentUsername: string;
+  badgeType: BadgeType;
+  title: string;
+  description: string;
+  iconName: string; // 'Award' | 'Sparkles' | 'BookMarked' | 'Gamepad2' | 'Star'
+  earnedAt: string;
+  sourceTitle?: string;
+}
+
+export interface StudentBadgeSummary {
+  studentUsername: string;
+  studentName?: string;
+  totalBadges: number;
+  assignmentBadges: number;
+  aiBadges: number;
+  gameBadges: number;
+  badges: StudentBadge[];
+  lastEarnedAt?: string;
+  rank?: number;
+}
+

@@ -1,5 +1,16 @@
 import { supabase } from '../lib/supabase';
-import { Note, Assignment, AssignmentSubmission, Message, User, EducationalGame, GameCompletion } from '../types';
+import { 
+  Note, 
+  Assignment, 
+  AssignmentSubmission, 
+  Message, 
+  User, 
+  EducationalGame, 
+  GameCompletion,
+  StudentBadge,
+  BadgeType,
+  StudentBadgeSummary
+} from '../types';
 
 // Storage keys for local fallback
 const STORAGE_KEYS = {
@@ -594,3 +605,249 @@ export const submitGameCompletionToDB = async (
 
   return newComp;
 };
+
+// --- 5. BADGES & GAMIFICATION (ROZET SİSTEMİ & LİDERLİK TABLOSU) ---
+const BADGES_STORAGE_KEY = 'burak_student_badges';
+
+export const defaultBadges: StudentBadge[] = [
+  {
+    id: 'badge-seed-1',
+    studentUsername: 'ahmet',
+    badgeType: 'assignment',
+    title: 'Ödev Şampiyonu',
+    description: 'Vektörler ve Kuvvet Dengesi Problemleri ödevini başarıyla tamamladı.',
+    iconName: 'BookMarked',
+    earnedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+    sourceTitle: 'Fizik & Bilim: Vektörler ve Kuvvet Dengesi Problemleri',
+  },
+  {
+    id: 'badge-seed-2',
+    studentUsername: 'ahmet',
+    badgeType: 'ai_tool',
+    title: 'Yapay Zeka Kaşifi',
+    description: 'ChatGPT yapay zeka aracını inceleyip ders hazırlığında tecrübe kazandı.',
+    iconName: 'Sparkles',
+    earnedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    sourceTitle: 'ChatGPT',
+  },
+  {
+    id: 'badge-seed-3',
+    studentUsername: 'ahmet',
+    badgeType: 'ai_tool',
+    title: 'Görsel Tasarım Yıldızı',
+    description: 'Canva Tasarımlarım aracını inceleyerek görsel araçları keşfetti.',
+    iconName: 'Sparkles',
+    earnedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    sourceTitle: 'Canva Tasarımlarım',
+  },
+  {
+    id: 'badge-seed-4',
+    studentUsername: 'zeynep',
+    badgeType: 'assignment',
+    title: 'Ödev Şampiyonu',
+    description: 'Algoritma & Programlama: Döngüler ve Karar Yapıları ödevini başarıyla teslim etti.',
+    iconName: 'BookMarked',
+    earnedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
+    sourceTitle: 'Algoritma & Programlama: Döngüler ve Karar Yapıları',
+  },
+  {
+    id: 'badge-seed-5',
+    studentUsername: 'zeynep',
+    badgeType: 'ai_tool',
+    title: 'Yapay Zeka Kaşifi',
+    description: 'Napkin AI diyagram ve şema aracını keşfetti.',
+    iconName: 'Sparkles',
+    earnedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+    sourceTitle: 'Napkin AI',
+  },
+  {
+    id: 'badge-seed-6',
+    studentUsername: 'mehmet',
+    badgeType: 'ai_tool',
+    title: 'Yapay Zeka Kaşifi',
+    description: 'Wayground Quiz yapay zeka değerlendirme aracını keşfetti.',
+    iconName: 'Sparkles',
+    earnedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+    sourceTitle: 'Wayground Quiz',
+  },
+];
+
+export const fetchBadgesFromDB = async (): Promise<StudentBadge[]> => {
+  let list: StudentBadge[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('student_badges')
+      .select('*')
+      .order('earned_at', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      list = data.map((d: any) => ({
+        id: d.id,
+        studentUsername: d.student_username,
+        badgeType: d.badge_type,
+        title: d.title,
+        description: d.description,
+        iconName: d.icon_name || 'Award',
+        earnedAt: d.earned_at || d.earnedAt,
+        sourceTitle: d.source_title || d.sourceTitle,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchBadges fallback:', err);
+  }
+
+  if (list.length === 0) {
+    const saved = localStorage.getItem(BADGES_STORAGE_KEY);
+    if (saved) {
+      try {
+        list = JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list = defaultBadges;
+    localStorage.setItem(BADGES_STORAGE_KEY, JSON.stringify(list));
+  }
+
+  return list;
+};
+
+export const awardBadgeToStudent = async (
+  studentUsername: string,
+  badgeType: BadgeType,
+  title: string,
+  description: string,
+  iconName: string,
+  sourceTitle?: string
+): Promise<{ badge: StudentBadge; isNew: boolean; totalBadges: number }> => {
+  const cleanUsername = studentUsername.trim().toLowerCase();
+  const allBadges = await fetchBadgesFromDB();
+
+  // Check if student already has this badge for the exact same source (e.g. clicked the same AI tool twice)
+  const alreadyEarned = allBadges.some(
+    (b) =>
+      b.studentUsername.toLowerCase() === cleanUsername &&
+      b.badgeType === badgeType &&
+      (sourceTitle ? b.sourceTitle?.toLowerCase() === sourceTitle.toLowerCase() : true)
+  );
+
+  const studentCurrentBadges = allBadges.filter(
+    (b) => b.studentUsername.toLowerCase() === cleanUsername
+  );
+
+  if (alreadyEarned) {
+    return {
+      badge: studentCurrentBadges[0],
+      isNew: false,
+      totalBadges: studentCurrentBadges.length,
+    };
+  }
+
+  const newBadge: StudentBadge = {
+    id: `badge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    studentUsername: cleanUsername,
+    badgeType,
+    title,
+    description,
+    iconName,
+    earnedAt: new Date().toISOString(),
+    sourceTitle,
+  };
+
+  const updatedBadges = [newBadge, ...allBadges];
+  localStorage.setItem(BADGES_STORAGE_KEY, JSON.stringify(updatedBadges));
+
+  // Try Supabase insert
+  try {
+    await supabase.from('student_badges').insert([
+      {
+        id: newBadge.id,
+        student_username: newBadge.studentUsername,
+        badge_type: newBadge.badgeType,
+        title: newBadge.title,
+        description: newBadge.description,
+        icon_name: newBadge.iconName,
+        earned_at: newBadge.earnedAt,
+        source_title: newBadge.sourceTitle,
+      },
+    ]);
+  } catch (err) {
+    console.warn('Supabase awardBadge warning:', err);
+  }
+
+  // Dispatch a browser event so listening components (header, toasts) update immediately
+  try {
+    window.dispatchEvent(
+      new CustomEvent('badge-earned', {
+        detail: { badge: newBadge, totalBadges: studentCurrentBadges.length + 1 },
+      })
+    );
+  } catch (e) {
+    // ignore
+  }
+
+  return {
+    badge: newBadge,
+    isNew: true,
+    totalBadges: studentCurrentBadges.length + 1,
+  };
+};
+
+export const fetchStudentBadges = async (studentUsername: string): Promise<StudentBadge[]> => {
+  const allBadges = await fetchBadgesFromDB();
+  const clean = studentUsername.trim().toLowerCase();
+  return allBadges.filter((b) => b.studentUsername.toLowerCase() === clean);
+};
+
+export const fetchLeaderboardFromDB = async (): Promise<StudentBadgeSummary[]> => {
+  const allBadges = await fetchBadgesFromDB();
+  const studentMap = new Map<string, StudentBadge[]>();
+
+  allBadges.forEach((b) => {
+    const user = b.studentUsername.toLowerCase();
+    const existing = studentMap.get(user) || [];
+    studentMap.set(user, [...existing, b]);
+  });
+
+  const summaryList: StudentBadgeSummary[] = [];
+
+  studentMap.forEach((badges, studentUsername) => {
+    const assignmentBadges = badges.filter((b) => b.badgeType === 'assignment').length;
+    const aiBadges = badges.filter((b) => b.badgeType === 'ai_tool').length;
+    const gameBadges = badges.filter((b) => b.badgeType === 'game').length;
+
+    // sort badges of student by earnedAt desc
+    badges.sort((a, b) => new Date(b.earnedAt).getTime() - new Date(a.earnedAt).getTime());
+
+    summaryList.push({
+      studentUsername,
+      studentName: studentUsername.charAt(0).toUpperCase() + studentUsername.slice(1),
+      totalBadges: badges.length,
+      assignmentBadges,
+      aiBadges,
+      gameBadges,
+      badges,
+      lastEarnedAt: badges[0]?.earnedAt,
+    });
+  });
+
+  // Sort descending by totalBadges, then by lastEarnedAt
+  summaryList.sort((a, b) => {
+    if (b.totalBadges !== a.totalBadges) {
+      return b.totalBadges - a.totalBadges;
+    }
+    return (
+      new Date(b.lastEarnedAt || 0).getTime() - new Date(a.lastEarnedAt || 0).getTime()
+    );
+  });
+
+  // Assign ranks
+  return summaryList.map((item, index) => ({
+    ...item,
+    rank: index + 1,
+  }));
+};
+

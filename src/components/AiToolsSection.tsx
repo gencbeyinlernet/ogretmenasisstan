@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AITool } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, ExternalLink, Plus, Trash2, Edit2, X, Check } from 'lucide-react';
+import { awardBadgeToStudent } from '../services/supabaseService';
+import { Sparkles, ExternalLink, Plus, Trash2, Edit2, X, Check, Award } from 'lucide-react';
 
 const defaultAiTools: AITool[] = [
   {
@@ -35,7 +36,7 @@ const defaultAiTools: AITool[] = [
 ];
 
 export const AiToolsSection: React.FC = () => {
-  const { isTeacher } = useAuth();
+  const { currentUser, isTeacher, isStudent } = useAuth();
   const [tools, setTools] = useState<AITool[]>(() => {
     const saved = localStorage.getItem('burak_ai_tools');
     if (saved) {
@@ -47,6 +48,19 @@ export const AiToolsSection: React.FC = () => {
     }
     return defaultAiTools;
   });
+
+  const handleToolClick = (tool: AITool) => {
+    if (isStudent && currentUser) {
+      awardBadgeToStudent(
+        currentUser.username,
+        'ai_tool',
+        'Yapay Zeka Kaşifi',
+        `"${tool.name}" yapay zeka aracını incelediniz ve keşif deneyimi kazandınız!`,
+        'Sparkles',
+        tool.name
+      );
+    }
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<AITool | null>(null);
@@ -150,6 +164,7 @@ export const AiToolsSection: React.FC = () => {
               href={tool.url}
               target="_blank"
               rel="noreferrer"
+              onClick={() => handleToolClick(tool)}
               className="group relative p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-slate-50/70 transition-all flex flex-col justify-between cursor-pointer"
             >
               <div>
@@ -162,9 +177,17 @@ export const AiToolsSection: React.FC = () => {
                       <h4 className="text-xs font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
                         {tool.name}
                       </h4>
-                      <span className="text-[10px] text-slate-500 font-medium">{tool.badge}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-medium">{tool.badge}</span>
+                        {isStudent && (
+                          <span className="text-[9px] font-black text-cyan-700 bg-cyan-100/80 px-1.5 py-0.2 rounded-full inline-flex items-center gap-0.5">
+                            <Sparkles size={8} /> +1 Rozet
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+
 
                   <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     {isTeacher && (

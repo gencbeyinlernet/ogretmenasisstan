@@ -5,8 +5,10 @@ import {
   fetchGamesFromDB, 
   saveGameToDB, 
   deleteGameFromDB, 
-  submitGameCompletionToDB 
+  submitGameCompletionToDB,
+  awardBadgeToStudent
 } from '../services/supabaseService';
+
 import { MiniTetris } from './MiniTetris';
 import { QuizDuel } from './QuizDuel';
 import { 
@@ -118,18 +120,30 @@ export const GamesSection: React.FC = () => {
         completionScore.trim() || undefined,
         completionNote.trim() || undefined
       );
+
+      // Award game badge
+      await awardBadgeToStudent(
+        currentUser.username,
+        'game',
+        'Oyun Ustası Rozeti',
+        `"${completingGame.title}" eğitici oyununu başarıyla tamamladınız!`,
+        'Gamepad2',
+        completingGame.title
+      );
+
       setCompletionSuccess(true);
       setTimeout(() => {
         setCompletionSuccess(false);
         setCompletingGame(null);
         setCompletionScore('');
         setCompletionNote('');
-      }, 1500);
+      }, 1800);
       await loadGames();
     } finally {
       setIsSubmittingCompletion(false);
     }
   };
+
 
   return (
     <div className="space-y-6">
