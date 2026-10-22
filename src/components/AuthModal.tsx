@@ -62,10 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickFillTeacher = () => {
-    setUsername('burakturgut');
-    setPassword('123456');
-  };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
@@ -137,21 +134,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Form Body */}
         <div className="p-6 space-y-4">
           {tab === 'teacher' && (
-            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 flex items-start justify-between gap-2">
-              <div>
-                <span className="font-bold block mb-0.5">Öğretmen Yönetim Modu</span>
-                <p className="text-[11px] text-indigo-700">
-                  İçerik ekleme, not düzenleme, sınıf yoklama ve e-tablo puanlama yetkilerine sahip tam erişim.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleQuickFillTeacher}
-                className="px-2 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded hover:bg-indigo-700 shrink-0 cursor-pointer"
-                title="Kullanıcı adı ve şifreyi doldur"
-              >
-                Otomatik Doldur
-              </button>
+            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900">
+              <span className="font-bold block mb-0.5">Öğretmen Yönetim Modu</span>
+              <p className="text-[11px] text-indigo-700">
+                İçerik ekleme, not düzenleme, sınıf yoklama, ödev yönetimi ve e-tablo puanlama yetkilerine sahip yetkili erişim.
+              </p>
             </div>
           )}
 

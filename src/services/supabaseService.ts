@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Note, Assignment, AssignmentSubmission, Message, User } from '../types';
+import { Note, Assignment, AssignmentSubmission, Message, User, EducationalGame, GameCompletion } from '../types';
 
 // Storage keys for local fallback
 const STORAGE_KEYS = {
@@ -401,4 +401,196 @@ export const sendMessageToDB = async (
   }
 
   return newMsg;
+};
+
+// --- 4. EDUCATIONAL GAMES & COMPLETION TRACKING ---
+export const defaultGames: EducationalGame[] = [
+  {
+    id: 'game-1',
+    title: 'Canva Mini Tetris',
+    description: 'Blokları yerleştir, satırları tamamla, odaklanma ve uzamsal zekayı geliştir.',
+    url: 'https://canvawebsitesi.my.canva.site/mini-tetris',
+    category: 'Zeka & Mantık',
+    grade: 'Tüm Sınıflar',
+    createdAt: new Date().toISOString(),
+    createdBy: 'burakturgut',
+  },
+  {
+    id: 'game-2',
+    title: 'Canva Bilgi Düellosu',
+    description: 'Bilişim, fen ve genel kültür sorularıyla arkadaşlarınla veya zamana karşı yarış.',
+    url: 'https://canvawebsitesi.my.canva.site/bilgi-d-ellosu',
+    category: 'Quiz & Düello',
+    grade: 'Tüm Sınıflar',
+    createdAt: new Date().toISOString(),
+    createdBy: 'burakturgut',
+  },
+  {
+    id: 'game-3',
+    title: 'Wayground Eğlenceli Quiz',
+    description: 'Etkileşimli testler ve müfredat pekiştirme sorularıyla yarış.',
+    url: 'https://wayground.com',
+    category: 'Ders Pekiştirme',
+    grade: 'Tüm Sınıflar',
+    createdAt: new Date().toISOString(),
+    createdBy: 'burakturgut',
+  },
+];
+
+const GAMES_STORAGE_KEY = 'burak_educational_games';
+const COMPLETIONS_STORAGE_KEY = 'burak_game_completions';
+
+export const fetchGamesFromDB = async (): Promise<EducationalGame[]> => {
+  let list: EducationalGame[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      list = data.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        description: d.description,
+        url: d.url,
+        category: d.category || 'Genel',
+        grade: d.grade || 'Tüm Sınıflar',
+        createdAt: d.created_at || d.createdAt,
+        createdBy: d.created_by || 'burakturgut',
+        thumbnail: d.thumbnail,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchGames fallback:', err);
+  }
+
+  if (list.length === 0) {
+    const saved = localStorage.getItem(GAMES_STORAGE_KEY);
+    if (saved) {
+      try {
+        list = JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list = defaultGames;
+    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(list));
+  }
+
+  // Attach completions
+  const completions = await fetchGameCompletionsFromDB();
+  return list.map((g) => ({
+    ...g,
+    completions: completions.filter((c) => c.gameId === g.id),
+  }));
+};
+
+export const saveGameToDB = async (game: EducationalGame): Promise<void> => {
+  const current = await fetchGamesFromDB();
+  const exists = current.some((g) => g.id === game.id);
+  const updated = exists
+    ? current.map((g) => (g.id === game.id ? game : g))
+    : [game, ...current];
+
+  localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(updated));
+
+  try {
+    await supabase.from('games').upsert({
+      id: game.id,
+      title: game.title,
+      description: game.description,
+      url: game.url,
+      category: game.category,
+      grade: game.grade,
+      created_by: game.createdBy,
+      created_at: game.createdAt,
+    });
+  } catch (err) {
+    console.warn('Supabase saveGame warning:', err);
+  }
+};
+
+export const deleteGameFromDB = async (id: string): Promise<void> => {
+  const current = await fetchGamesFromDB();
+  const updated = current.filter((g) => g.id !== id);
+  localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(updated));
+
+  try {
+    await supabase.from('games').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase deleteGame warning:', err);
+  }
+};
+
+export const fetchGameCompletionsFromDB = async (): Promise<GameCompletion[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('game_completions')
+      .select('*')
+      .order('completed_at', { ascending: false });
+
+    if (data && !error && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id,
+        gameId: d.game_id,
+        studentUsername: d.student_username,
+        completedAt: d.completed_at,
+        score: d.score,
+        notes: d.notes,
+      }));
+    }
+  } catch (err) {
+    console.warn('Supabase fetchGameCompletions fallback:', err);
+  }
+
+  const saved = localStorage.getItem(COMPLETIONS_STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return [];
+};
+
+export const submitGameCompletionToDB = async (
+  gameId: string,
+  studentUsername: string,
+  score?: string,
+  notes?: string
+): Promise<GameCompletion> => {
+  const newComp: GameCompletion = {
+    id: `comp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    gameId,
+    studentUsername,
+    completedAt: new Date().toISOString(),
+    score: score?.trim() || undefined,
+    notes: notes?.trim() || undefined,
+  };
+
+  const existing = await fetchGameCompletionsFromDB();
+  const updated = [newComp, ...existing];
+  localStorage.setItem(COMPLETIONS_STORAGE_KEY, JSON.stringify(updated));
+
+  try {
+    await supabase.from('game_completions').insert([
+      {
+        id: newComp.id,
+        game_id: newComp.gameId,
+        student_username: newComp.studentUsername,
+        completed_at: newComp.completedAt,
+        score: newComp.score,
+        notes: newComp.notes,
+      },
+    ]);
+  } catch (err) {
+    console.warn('Supabase submitGameCompletion warning:', err);
+  }
+
+  return newComp;
 };

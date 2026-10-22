@@ -103,3 +103,25 @@ export interface Message {
   createdAt: string;
   isRead?: boolean;
 }
+
+export interface EducationalGame {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  category: string;
+  grade: string;
+  createdAt: string;
+  createdBy: string;
+  thumbnail?: string;
+  completions?: GameCompletion[];
+}
+
+export interface GameCompletion {
+  id: string;
+  gameId: string;
+  studentUsername: string;
+  completedAt: string;
+  score?: string;
+  notes?: string;
+}

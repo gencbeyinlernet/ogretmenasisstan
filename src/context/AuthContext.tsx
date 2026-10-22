@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return { 
       success: false, 
-      error: 'Kullanıcı adı veya şifre hatalı! (Öğretmen: burakturgut, şifre: 123456)' 
+      error: 'Kullanıcı adı veya şifre hatalı. Lütfen bilgilerinizi kontrol ediniz.' 
     };
   };
 

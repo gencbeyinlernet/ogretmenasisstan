@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
 import { AuthModal } from './components/AuthModal';
-import { SqlSetupModal } from './components/SqlSetupModal';
 import { TopBar } from './components/TopBar';
 import { HeroSlider } from './components/HeroSlider';
 import { AiToolsSection } from './components/AiToolsSection';
@@ -46,7 +45,6 @@ function AppContent() {
   const [isAnnualPlansOpen, setIsAnnualPlansOpen] = useState<boolean>(false);
   const [isLinkEditorOpen, setIsLinkEditorOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [isSqlModalOpen, setIsSqlModalOpen] = useState<boolean>(false);
   const [activeEditingLink, setActiveEditingLink] = useState<QuickLink | null>(null);
 
   // Quick link storage
@@ -84,27 +82,18 @@ function AppContent() {
   // 1. IF NO USER IS LOGGED IN: Render simple, clean Auth & Landing Screen
   // (Zero private notes, no attendance, no annual plans)
   if (!currentUser) {
-    return (
-      <>
-        <AuthScreen onOpenSqlModal={() => setIsSqlModalOpen(true)} />
-        <SqlSetupModal
-          isOpen={isSqlModalOpen}
-          onClose={() => setIsSqlModalOpen(false)}
-        />
-      </>
-    );
+    return <AuthScreen />;
   }
 
   // 2. LOGGED-IN EXPERIENCE (Teacher or Student)
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Top Bar with green SQL button, TEDx header, and role-filtered navigation */}
+      {/* Top Bar with TEDx header and role-filtered navigation */}
       <TopBar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenQuickNote={() => setActiveTab('notlar')}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onOpenSqlModal={() => setIsSqlModalOpen(true)}
       />
 
       {/* Role Banner Indicator */}
@@ -593,12 +582,6 @@ function AppContent() {
           </div>
         )}
       </main>
-
-      {/* SQL Setup Modal (Opens via green button) */}
-      <SqlSetupModal
-        isOpen={isSqlModalOpen}
-        onClose={() => setIsSqlModalOpen(false)}
-      />
 
       {/* Annual Plans Modal */}
       <AnnualPlansModal
